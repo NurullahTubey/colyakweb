@@ -1,70 +1,52 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react"
 
-export interface Event {
-  id: string
+type Event = {
+  _id?: string
+  id?: string
   title: string
   description: string
   date: string
   time: string
   location: string
   images: string[]
-  createdAt: string
+  createdAt?: string
 }
 
 export function useEvents() {
   const [events, setEvents] = useState<Event[]>([])
 
+  const fetchEvents = async () => {
+    const res = await fetch("/api/events")
+    const data = await res.json()
+    setEvents(data.map((event: any) => ({
+      ...event,
+      id: event._id // MongoDB ObjectId’yi `id` olarak eşle
+    })))
+  }
+
+  const addEvent = async (event: Event) => {
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event)
+    })
+    if (res.ok) {
+      fetchEvents()
+    }
+  }
+
+  const deleteEvent = async (id: string) => {
+    const res = await fetch(`/api/events/${id}`, {
+      method: "DELETE"
+    })
+    if (res.ok) {
+      fetchEvents()
+    }
+  }
+
   useEffect(() => {
-    // Local storage'dan etkinlikleri yükle
-    const savedEvents = localStorage.getItem("events")
-    if (savedEvents) {
-      setEvents(JSON.parse(savedEvents))
-    }
-
-    // Local storage değişikliklerini dinle
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "events") {
-        if (e.newValue) {
-          setEvents(JSON.parse(e.newValue))
-        } else {
-          setEvents([])
-        }
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    fetchEvents()
   }, [])
 
-  const addEvent = (event: Omit<Event, 'id' | 'createdAt'>) => {
-    const newEvent: Event = {
-      ...event,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    }
-    
-    const updatedEvents = [newEvent, ...events]
-    setEvents(updatedEvents)
-    localStorage.setItem("events", JSON.stringify(updatedEvents))
-    
-    // Diğer sekmelerde de güncelleme için storage event tetikle
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'events',
-      newValue: JSON.stringify(updatedEvents)
-    }))
-  }
-
-  const deleteEvent = (id: string) => {
-    const updatedEvents = events.filter(event => event.id !== id)
-    setEvents(updatedEvents)
-    localStorage.setItem("events", JSON.stringify(updatedEvents))
-    
-    // Diğer sekmelerde de güncelleme için storage event tetikle
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'events',
-      newValue: JSON.stringify(updatedEvents)
-    }))
-  }
-
   return { events, addEvent, deleteEvent }
-} 
+}
